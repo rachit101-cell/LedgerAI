@@ -1,36 +1,115 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LedgerAI Frontend — Next.js 15 Client Architecture
 
-## Getting Started
+[![Next.js: 15](https://img.shields.io/badge/Next.js-15-black.svg?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![React: 19](https://img.shields.io/badge/React-19-61DAFB.svg?logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript: 5](https://img.shields.io/badge/TypeScript-5-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS: 4](https://img.shields.io/badge/Tailwind_CSS-4-38B2AC.svg?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 
-First, run the development server:
+> **High-performance, glassmorphic financial management interface built with Next.js 15 (App Router), TypeScript, and Tailwind CSS.**
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## 🧭 Overview
+
+The LedgerAI frontend is designed to deliver a modern, intuitive, and mathematically rigorous experience for business owners. It provides real-time visibility into working capital, cash runways, pending receivables, supplier obligations, and interactive decision modeling.
+
+---
+
+## 📐 Architecture & Key Components
+
+```
+frontend/
+├── app/
+│   ├── layout.tsx              # Root HTML wrapper, metadata, and font declarations
+│   ├── page.tsx                # Dynamic view orchestrator and top-level tab state
+│   └── globals.css             # Tailwind CSS tokens, theme variables, glassmorphic styling
+├── components/
+│   ├── Navbar.tsx              # Live cash ticker, business switcher, and system alerts
+│   ├── Sidebar.tsx             # Workspace navigation (Overview, Invoices, Decisions, Reports, Settings)
+│   ├── Overview.tsx            # Executive KPI cards, cash runway chart, and deficit warnings
+│   ├── DecisionsView.tsx       # Cash Bridge Engine interactive comparison & discount simulators
+│   ├── InvoicesView.tsx        # Customer invoices & supplier bills with status badges
+│   ├── FinancialReportsView.tsx# P&L, balance sheets, and cash movement analysis
+│   ├── ActionApprovalModal.tsx # Cryptographic SHA-256 owner approval modal
+│   ├── PayPalCheckoutModal.tsx # Server-verified PayPal Sandbox checkout interface
+│   ├── RecordTransactionModal.tsx # Manual transaction entry with double-entry validation
+│   └── ChatAssistant.tsx       # Grounded AI chat interface with structured tool responses
+└── lib/
+    └── api.ts                  # Resilient API client with automatic production/local fallback
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 💡 Key UI Capabilities
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Interactive Cash Bridge Simulator (`DecisionsView.tsx`):**
+   - Side-by-side trade-off matrix: Option 1 (Full Face Collection), Option 2 (Cash Bridge Discount), Option 3 (Supplier Rescheduling).
+   - Dynamic simulation buttons: **2.0% Prompt Cash**, **3.5% Fast Cash**, and **5.0% Urgent Bridge**.
+   - Multi-customer target selector supporting dynamic calculations across customer profiles (e.g., Sharma Traders ₹35,000, Mehta Supermart ₹18,500).
+   - Real-time buffer forecasting showing net cash impact after 100% full supplier payment.
 
-## Learn More
+2. **Cryptographic Owner Authorization (`ActionApprovalModal.tsx`):**
+   - Displays clear legal recipient, discount terms, and net expected cash inflow.
+   - Computes and verifies SHA-256 payload checksums before enabling the dispatch trigger.
+   - Enforces human-in-the-loop governance for all external payment demands.
 
-To learn more about Next.js, take a look at the following resources:
+3. **Server-Verified PayPal Checkout (`PayPalCheckoutModal.tsx`):**
+   - Seamlessly generates real PayPal Sandbox Orders v2.
+   - Embeds PayPal Sandbox checkout actions and handles return URL tokens (`token`, `PayerID`).
+   - Displays server-side capture verification and instant ledger reconciliation status.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. **Executive Financial Summary (`Overview.tsx` & `FinancialReportsView.tsx`):**
+   - Indian currency notation (`₹` / `en-IN`) across all monetary representations.
+   - Clear visual indicators for overdue receivables and upcoming supplier due dates.
+   - 14-day cash runway projection with automated deficit detection.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🛠️ Getting Started
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Prerequisites
+- Node.js 18.18+ or 20.x
+- npm, pnpm, or yarn
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Installation
+```bash
+# From frontend directory
+npm install
+```
+
+### Environment Configuration
+Create a `.env.local` file in `frontend/` (optional, defaults to `http://localhost:8000` for local development):
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+*For production builds, set `NEXT_PUBLIC_API_URL` to your hosted backend (e.g., `https://ledgerai-backend-0ive.onrender.com`).*
+
+### Development Mode
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) to view the application.
+
+### Production Build & Typecheck
+```bash
+# Typecheck
+npx tsc --noEmit
+
+# Production Build
+npm run build
+
+# Start Production Server
+npm run start
+```
+
+---
+
+## 🎨 Design System & Styling
+- **Typography:** Inter & Geist Mono.
+- **Color Palette:** Slate neutrals, emerald accents for positive cash flow, rose accents for obligations, and indigo highlights for Cash Bridge interventions.
+- **Glassmorphism:** Subdued borders (`border-white/10` or `border-slate-200/80`), backdrops (`backdrop-blur-md`), and high-contrast typography ensuring complete readability in all lighting environments.
+
+---
+
+## 📄 License
+This project is part of LedgerAI and is released under the [MIT License](../LICENSE).
