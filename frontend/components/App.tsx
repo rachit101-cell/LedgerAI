@@ -37,6 +37,7 @@ export default function App() {
   const [payPalDocId, setPayPalDocId] = useState<string | null>(null);
   const [recordTransactionDocId, setRecordTransactionDocId] = useState<string | null | undefined>(undefined);
   const [showRecordOrderModal, setShowRecordOrderModal] = useState<boolean>(false);
+  const [bridgeTargetDocId, setBridgeTargetDocId] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
@@ -262,7 +263,10 @@ export default function App() {
                   onInitiatePayPal={(doc) => setPayPalDocId(doc.id)}
                   onReconcilePayPal={handleReconcilePayPal}
                   onRefresh={loadData}
-                  onSimulateExtension={() => setActiveTab('decisions')}
+                  onSimulateExtension={(docId) => {
+                    setBridgeTargetDocId(docId || null);
+                    setActiveTab('decisions');
+                  }}
                   onOpenRecordTransaction={(docId?: string) => setRecordTransactionDocId(docId ?? null)}
                   onOpenRecordOrder={() => setShowRecordOrderModal(true)}
                 />
@@ -292,6 +296,8 @@ export default function App() {
 
               {activeTab === 'decisions' && (
                 <DecisionsView
+                  targetDocumentId={bridgeTargetDocId}
+                  documents={documents}
                   onOpenReviewModal={(draft) => setSelectedReviewDraft(draft)}
                   onRefreshData={loadData}
                 />

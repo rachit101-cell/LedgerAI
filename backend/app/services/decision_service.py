@@ -85,6 +85,22 @@ class DecisionService:
         target_contact_id: Optional[str] = None
         estimated_impact: Decimal = Decimal("0.00")
 
+        # Resolve target customer invoice (either explicitly requested or top priority overdue)
+        top_overdue = None
+        if eval_req and eval_req.target_document_id:
+            cand = (
+                db.query(Document)
+                .filter(
+                    Document.id == eval_req.target_document_id,
+                    Document.business_id == business_id
+                )
+                .first()
+            )
+            if cand and cand.status in ["issued", "partially_paid", "overdue"]:
+                top_overdue = cand
+        if not top_overdue:
+            top_overdue = overdue_invoices[0] if overdue_invoices else None
+
         if has_shortfall:
             problem_type = "cash_shortfall_risk"
             title = f"Projected Cash Deficit of INR {shortfall_amount:,.2f}"
@@ -92,7 +108,6 @@ class DecisionService:
             urgency = "immediate"
 
             top_bill = upcoming_bills[0] if upcoming_bills else None
-            top_overdue = overdue_invoices[0] if overdue_invoices else None
 
             bill_label = top_bill.document_number if top_bill else "Upcoming supplier obligations"
             bill_amt = top_bill.total if top_bill else obligations

@@ -80,6 +80,7 @@ export const api = {
   getDecisions: () => fetchJson<DecisionCase[]>('/decisions'),
   evaluateDecision: (req?: {
     discount_rate?: number;
+    target_document_id?: string;
     supplier_agreement_confirmed?: boolean;
     supplier_extension_days?: number;
     supplier_extension_fee?: number;

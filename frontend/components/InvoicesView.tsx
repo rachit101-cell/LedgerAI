@@ -12,7 +12,7 @@ interface InvoicesViewProps {
   onInitiatePayPal: (document: Document) => void;
   onReconcilePayPal: (documentId: string) => void;
   onRefresh: () => void;
-  onSimulateExtension?: () => void;
+  onSimulateExtension?: (docId?: string) => void;
   onOpenRecordTransaction?: (docId?: string) => void;
   onOpenRecordOrder?: () => void;
 }
@@ -598,7 +598,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
 
                                 {onSimulateExtension && (
                                   <button
-                                    onClick={onSimulateExtension}
+                                    onClick={() => onSimulateExtension(doc.id)}
                                     title="Offer prompt cash discount to customer to accelerate inflow"
                                     className="px-2.5 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-all shadow-2xs whitespace-nowrap active:scale-95"
                                   >

@@ -360,6 +360,7 @@ class DecisionOption(BaseModel):
 
 class DecisionEvaluateRequest(BaseModel):
     discount_rate: Optional[Decimal] = None  # e.g. Decimal("0.02") for 2% early discount
+    target_document_id: Optional[str] = None  # target customer invoice to bridge
     supplier_agreement_confirmed: Optional[bool] = False
     supplier_extension_days: Optional[int] = 14
     supplier_extension_fee: Optional[Decimal] = None

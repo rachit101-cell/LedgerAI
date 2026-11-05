@@ -2,15 +2,22 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../lib/api';
-import { DecisionCase, DecisionOption, DecisionOutcomeLedgerItem, ActionDraft } from '../types';
+import { DecisionCase, DecisionOption, DecisionOutcomeLedgerItem, ActionDraft, Document } from '../types';
 import { IconShieldCheck, IconAlertTriangle, IconCheckCircle, IconRefresh, IconArrowUpRight, IconClock, IconPayPal } from './Icons';
 
 interface DecisionsViewProps {
   onOpenReviewModal: (draft: ActionDraft) => void;
   onRefreshData?: () => void;
+  documents?: Document[];
+  targetDocumentId?: string | null;
 }
 
-export const DecisionsView: React.FC<DecisionsViewProps> = ({ onOpenReviewModal, onRefreshData }) => {
+export const DecisionsView: React.FC<DecisionsViewProps> = ({
+  onOpenReviewModal,
+  onRefreshData,
+  documents = [],
+  targetDocumentId = null,
+}) => {
   const [activeDecision, setActiveDecision] = useState<DecisionCase | null>(null);
   const [allDecisions, setAllDecisions] = useState<DecisionCase[]>([]);
   const [outcomeLedger, setOutcomeLedger] = useState<DecisionOutcomeLedgerItem[]>([]);
@@ -20,6 +27,14 @@ export const DecisionsView: React.FC<DecisionsViewProps> = ({ onOpenReviewModal,
   const [error, setError] = useState<string | null>(null);
   const [appliedParam, setAppliedParam] = useState<string>('standard');
   const [showAuditLedger, setShowAuditLedger] = useState<boolean>(false);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(targetDocumentId || null);
+
+  useEffect(() => {
+    if (targetDocumentId) {
+      setSelectedDocId(targetDocumentId);
+      handleEvaluate(undefined, undefined, targetDocumentId);
+    }
+  }, [targetDocumentId]);
 
   // Always evaluate against live database state on initial load
   const loadDecisionData = async (silent = false) => {
@@ -28,7 +43,8 @@ export const DecisionsView: React.FC<DecisionsViewProps> = ({ onOpenReviewModal,
       setError(null);
 
       // 1. Trigger live re-evaluation against active database records
-      const evaluatedCase = await api.evaluateDecision().catch(() => null);
+      const targetId = selectedDocId || targetDocumentId || undefined;
+      const evaluatedCase = await api.evaluateDecision(targetId ? { target_document_id: targetId } : undefined).catch(() => null);
 
       // 2. Fetch all decision cases and audit history
       const [cases, ledger] = await Promise.all([
@@ -55,12 +71,14 @@ export const DecisionsView: React.FC<DecisionsViewProps> = ({ onOpenReviewModal,
     loadDecisionData();
   }, []);
 
-  const handleEvaluate = async (discountRate?: number, supplierAgreed?: boolean) => {
+  const handleEvaluate = async (discountRate?: number, supplierAgreed?: boolean, docId?: string) => {
     try {
       setEvaluating(true);
       setError(null);
-      const req = (discountRate !== undefined || supplierAgreed !== undefined) ? {
+      const effectiveDocId = docId !== undefined ? docId : (selectedDocId || undefined);
+      const req = (discountRate !== undefined || supplierAgreed !== undefined || effectiveDocId) ? {
         discount_rate: discountRate,
+        target_document_id: effectiveDocId || undefined,
         supplier_agreement_confirmed: supplierAgreed,
         supplier_extension_days: 14,
       } : undefined;
@@ -78,8 +96,16 @@ export const DecisionsView: React.FC<DecisionsViewProps> = ({ onOpenReviewModal,
       if (onRefreshData) {
         onRefreshData();
       }
+
+      if (updatedCase.action_draft_id) {
+        const drafts = await api.getActionDrafts();
+        const draft = drafts.find((d) => d.id === updatedCase.action_draft_id);
+        if (draft) {
+          onOpenReviewModal(draft);
+        }
+      }
     } catch (err: any) {
-      setError(err.message || 'Evaluation failed');
+      setError(err.message || 'Failed to evaluate decision');
     } finally {
       setEvaluating(false);
     }
@@ -479,13 +505,43 @@ export const DecisionsView: React.FC<DecisionsViewProps> = ({ onOpenReviewModal,
           </span>
         </div>
 
+        {/* Customer Invoice Target Selector */}
+        {documents && documents.filter((d) => d.document_type === 'invoice' && Number(d.outstanding_amount) > 0).length > 1 && (
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-700">Target Receivable:</span>
+              <select
+                value={selectedDocId || activeDecision?.target_document_id || ''}
+                onChange={(e) => {
+                  const val = e.target.value || null;
+                  setSelectedDocId(val);
+                  setAppliedParam('standard');
+                  handleEvaluate(undefined, undefined, val || undefined);
+                }}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-900 shadow-2xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              >
+                {documents
+                  .filter((d) => d.document_type === 'invoice' && Number(d.outstanding_amount) > 0)
+                  .map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.contact_name || 'Customer'} — {d.document_number} (Outstanding: ₹{Number(d.outstanding_amount).toLocaleString('en-IN')})
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <span className="text-[11px] text-slate-500">
+              Switch target to model discounts for Sharma Traders, Mehta Supermart, etc.
+            </span>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {/* Baseline Button */}
           <button
             disabled={evaluating}
             onClick={() => {
               setAppliedParam('standard');
-              handleEvaluate();
+              handleEvaluate(undefined, undefined, selectedDocId || undefined);
             }}
             className={`p-3.5 rounded-xl border text-left transition-all ${
               appliedParam === 'standard'
@@ -511,7 +567,7 @@ export const DecisionsView: React.FC<DecisionsViewProps> = ({ onOpenReviewModal,
             disabled={evaluating}
             onClick={() => {
               setAppliedParam('2pct');
-              handleEvaluate(0.02);
+              handleEvaluate(0.02, undefined, selectedDocId || undefined);
             }}
             className={`p-3.5 rounded-xl border text-left transition-all ${
               appliedParam === '2pct'
@@ -539,7 +595,7 @@ export const DecisionsView: React.FC<DecisionsViewProps> = ({ onOpenReviewModal,
             disabled={evaluating}
             onClick={() => {
               setAppliedParam('3.5pct');
-              handleEvaluate(0.035);
+              handleEvaluate(0.035, undefined, selectedDocId || undefined);
             }}
             className={`p-3.5 rounded-xl border text-left transition-all ${
               appliedParam === '3.5pct'
@@ -567,7 +623,7 @@ export const DecisionsView: React.FC<DecisionsViewProps> = ({ onOpenReviewModal,
             disabled={evaluating}
             onClick={() => {
               setAppliedParam('5pct');
-              handleEvaluate(0.05);
+              handleEvaluate(0.05, undefined, selectedDocId || undefined);
             }}
             className={`p-3.5 rounded-xl border text-left transition-all ${
               appliedParam === '5pct'
