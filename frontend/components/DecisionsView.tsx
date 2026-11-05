@@ -440,7 +440,7 @@ export const DecisionsView: React.FC<DecisionsViewProps> = ({ onOpenReviewModal,
                 after paying {targetBillRecord?.contact_name || 'suppliers'} 100% in full ({formatCurrency(payablesDue)})
               </span>
 
-              {activeDecision.action_draft_id ? (
+              {activeDecision.action_draft_id && recommendedOption?.requires_approval ? (
                 <button
                   onClick={() => handleReviewAction(activeDecision.action_draft_id!)}
                   className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5"
@@ -704,13 +704,29 @@ export const DecisionsView: React.FC<DecisionsViewProps> = ({ onOpenReviewModal,
 
                 {/* Bottom Action Button */}
                 <div className="mt-4 pt-3 border-t border-slate-100">
-                  {isSelected && actionDraftId ? (
+                  {isSelected && actionDraftId && opt.requires_approval ? (
                     <button
                       onClick={() => handleReviewAction(actionDraftId)}
                       className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-md active:scale-95"
                     >
                       <IconShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
                       <span>Review & Authorize Link →</span>
+                    </button>
+                  ) : isSelected && opt.action_type === 'monitor_cash_position' ? (
+                    <button
+                      disabled
+                      className="w-full py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 cursor-default flex items-center justify-center gap-1.5"
+                    >
+                      <IconCheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Routine Monitoring Active</span>
+                    </button>
+                  ) : isSelected ? (
+                    <button
+                      disabled
+                      className="w-full py-2.5 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 cursor-default flex items-center justify-center gap-1.5"
+                    >
+                      <IconCheckCircle className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Strategy Active</span>
                     </button>
                   ) : (
                     <button

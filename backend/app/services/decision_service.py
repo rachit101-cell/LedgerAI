@@ -940,6 +940,7 @@ class DecisionService:
             case.status = "awaiting_approval"
         else:
             # Action does not require external execution draft
+            case.action_draft_id = None
             case.status = "approved" if selected_opt.get("requires_approval") else "executed"
 
         case.updated_at = utc_now()
