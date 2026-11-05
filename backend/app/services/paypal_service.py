@@ -48,7 +48,9 @@ class PayPalService:
             return None
 
     @classmethod
-    async def create_order_for_document(cls, db: Session, document: Document) -> Dict[str, Any]:
+    async def create_order_for_document(
+        cls, db: Session, document: Document, frontend_url: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Creates a genuine PayPal checkout order in the Sandbox for an internal invoice.
         Requires valid server-side credentials. Never simulates order creation.
@@ -108,6 +110,14 @@ class PayPalService:
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
         }
+        from urllib.parse import urlparse
+        target_origin = (frontend_url or getattr(settings, "FRONTEND_URL", None) or "https://ledger-ai-ruby.vercel.app").strip()
+        parsed = urlparse(target_origin)
+        if parsed.scheme and parsed.netloc:
+            base_return = f"{parsed.scheme}://{parsed.netloc}"
+        else:
+            base_return = target_origin.rstrip("/")
+
         payload = {
             "intent": "CAPTURE",
             "purchase_units": [
@@ -125,8 +135,8 @@ class PayPalService:
                 "brand_name": "Apex Enterprises",
                 "landing_page": "BILLING",
                 "user_action": "PAY_NOW",
-                "return_url": f"http://localhost:3000/?tab=invoices&paypal_success=true&doc_id={document.id}",
-                "cancel_url": f"http://localhost:3000/?tab=invoices&paypal_cancel=true&doc_id={document.id}"
+                "return_url": f"{base_return}/?tab=invoices&paypal_success=true&doc_id={document.id}",
+                "cancel_url": f"{base_return}/?tab=invoices&paypal_cancel=true&doc_id={document.id}"
             }
         }
 

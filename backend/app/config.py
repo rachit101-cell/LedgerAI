@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     PAYPAL_CLIENT_SECRET: str = os.getenv("PAYPAL_CLIENT_SECRET", "")
     PAYPAL_WEBHOOK_ID: str = os.getenv("PAYPAL_WEBHOOK_ID", "")
     PAYPAL_EXCHANGE_RATE_INR_PER_USD: float = float(os.getenv("PAYPAL_EXCHANGE_RATE_INR_PER_USD", "85.00"))
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://ledger-ai-ruby.vercel.app")
     
     @property
     def paypal_api_base(self) -> str:

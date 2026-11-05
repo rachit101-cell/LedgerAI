@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/v1", tags=["PayPal Sandbox Integration"])
 @router.post("/integrations/paypal/create-order", response_model=PayPalCreateOrderResponse)
 async def create_paypal_order(
     req: PayPalCreateOrderRequest,
+    request: Request,
     ctx: WorkspaceContext = Depends(require_owner_role),
     db: Session = Depends(get_db)
 ):
@@ -25,7 +26,8 @@ async def create_paypal_order(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found in active workspace.")
 
-    res = await PayPalService.create_order_for_document(db, doc)
+    origin = request.headers.get("origin") or request.headers.get("referer")
+    res = await PayPalService.create_order_for_document(db, doc, frontend_url=origin)
     return PayPalCreateOrderResponse(**res)
 
 @router.post("/integrations/paypal/capture-order", response_model=PayPalReconcileResponse)
