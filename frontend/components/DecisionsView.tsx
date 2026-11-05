@@ -220,19 +220,22 @@ export const DecisionsView: React.FC<DecisionsViewProps> = ({
             : `Draft owner-authorized collection link for full overdue balance. Fulfills 100% supplier payout.`,
         };
       case 'opt_early_discount':
-      case 'EARLY_DISCOUNT':
+      case 'EARLY_DISCOUNT': {
+        const ratePct = opt.discount_rate
+          ? `${(Number(opt.discount_rate) * 100).toFixed(1)}%`
+          : 'Prompt Cash';
+        const discCost = opt.known_direct_cost ?? opt.discount_amount ?? (overdueBalance * (Number(opt.discount_rate) || 0.02));
         return {
           category: 'Customer Bridge Cash Offer',
-          badge: opt.discount_rate ? `${(Number(opt.discount_rate) * 100).toFixed(1)}% Early Settlement` : '2% Early Settlement',
+          badge: `${ratePct} Early Settlement`,
           badgeClass: 'bg-indigo-50 text-indigo-800 border-indigo-200',
           speed: 'Settles in 24–48 Hours',
-          tradeoff: opt.known_direct_cost
-            ? `Customer Discount: -${formatCurrency(Number(opt.known_direct_cost))}`
-            : 'Customer Discount: -₹700',
+          tradeoff: `Customer Discount: -${formatCurrency(Number(discCost))}`,
           summary: opt.description
             ? opt.description.replace(/INR\s*/g, '₹')
             : `Customer receives a cash discount offer to pay less and settle immediately. The accelerated inflow is used to pay suppliers 100% in full.`,
         };
+      }
       case 'opt_reschedule_obligation':
       case 'SUPPLIER_EXTENSION':
         return {
@@ -506,146 +509,155 @@ export const DecisionsView: React.FC<DecisionsViewProps> = ({
         </div>
 
         {/* Customer Invoice Target Selector */}
-        {documents && documents.filter((d) => d.document_type === 'invoice' && Number(d.outstanding_amount) > 0).length > 1 && (
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-700">Target Receivable:</span>
-              <select
-                value={selectedDocId || activeDecision?.target_document_id || ''}
-                onChange={(e) => {
-                  const val = e.target.value || null;
-                  setSelectedDocId(val);
-                  setAppliedParam('standard');
-                  handleEvaluate(undefined, undefined, val || undefined);
-                }}
-                className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-900 shadow-2xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                {documents
-                  .filter((d) => d.document_type === 'invoice' && Number(d.outstanding_amount) > 0)
-                  .map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.contact_name || 'Customer'} — {d.document_number} (Outstanding: ₹{Number(d.outstanding_amount).toLocaleString('en-IN')})
-                    </option>
-                  ))}
-              </select>
-            </div>
-            <span className="text-[11px] text-slate-500">
-              Switch target to model discounts for Sharma Traders, Mehta Supermart, etc.
-            </span>
-          </div>
-        )}
+        {(() => {
+          const firstInvoiceId = (documents || []).find((d) => d.document_type === 'invoice' && Number(d.outstanding_amount) > 0)?.id;
+          const currentDocId = selectedDocId || activeDecision?.target_document_id || targetDocumentId || firstInvoiceId || undefined;
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {/* Baseline Button */}
-          <button
-            disabled={evaluating}
-            onClick={() => {
-              setAppliedParam('standard');
-              handleEvaluate(undefined, undefined, selectedDocId || undefined);
-            }}
-            className={`p-3.5 rounded-xl border text-left transition-all ${
-              appliedParam === 'standard'
-                ? 'bg-slate-50 border-2 border-slate-400 text-slate-900 ring-2 ring-slate-200/80 shadow-2xs'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-900">Standard 0%</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">100% Inflow</span>
-            </div>
-            <div className="text-xs font-mono mt-1.5">
-              Net Buffer:{' '}
-              <strong className="text-slate-900 font-bold">
-                {simStandardBuffer >= 0 ? `+${formatCurrency(simStandardBuffer)}` : `-${formatCurrency(Math.abs(simStandardBuffer))}`}
-              </strong>
-            </div>
-            <span className="text-[10px] text-slate-500 block mt-1">Customer pays 100% full invoice</span>
-          </button>
+          return (
+            <>
+              {documents && documents.filter((d) => d.document_type === 'invoice' && Number(d.outstanding_amount) > 0).length > 1 && (
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-700">Target Receivable:</span>
+                    <select
+                      value={currentDocId || ''}
+                      onChange={(e) => {
+                        const val = e.target.value || null;
+                        setSelectedDocId(val);
+                        setAppliedParam('standard');
+                        handleEvaluate(undefined, undefined, val || undefined);
+                      }}
+                      className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-900 shadow-2xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    >
+                      {documents
+                        .filter((d) => d.document_type === 'invoice' && Number(d.outstanding_amount) > 0)
+                        .map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.contact_name || 'Customer'} — {d.document_number} (Outstanding: ₹{Number(d.outstanding_amount).toLocaleString('en-IN')})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    Switch target to model discounts for Sharma Traders, Mehta Supermart, etc.
+                  </span>
+                </div>
+              )}
 
-          {/* 2.0% Discount Button */}
-          <button
-            disabled={evaluating}
-            onClick={() => {
-              setAppliedParam('2pct');
-              handleEvaluate(0.02, undefined, selectedDocId || undefined);
-            }}
-            className={`p-3.5 rounded-xl border text-left transition-all ${
-              appliedParam === '2pct'
-                ? 'bg-emerald-50 border-2 border-emerald-500 text-emerald-950 ring-2 ring-emerald-200 shadow-2xs'
-                : 'bg-white hover:bg-emerald-50/40 text-slate-700 border border-emerald-200'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-emerald-950">2.0% Prompt Cash</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">★ Best Value</span>
-            </div>
-            <div className="text-xs font-mono mt-1.5">
-              Net Buffer:{' '}
-              <strong className="text-emerald-700 font-bold">
-                {sim2pctBuffer >= 0 ? `+${formatCurrency(sim2pctBuffer)}` : `-${formatCurrency(Math.abs(sim2pctBuffer))}`}
-              </strong>
-            </div>
-            <span className="text-[10px] text-emerald-700 block mt-1">
-              Customer pays 2% less (-{formatCurrency(Math.round(overdueBalance * 0.02))})
-            </span>
-          </button>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* Baseline Button */}
+                <button
+                  disabled={evaluating}
+                  onClick={() => {
+                    setAppliedParam('standard');
+                    handleEvaluate(undefined, undefined, currentDocId);
+                  }}
+                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                    appliedParam === 'standard'
+                      ? 'bg-slate-50 border-2 border-slate-400 text-slate-900 ring-2 ring-slate-200/80 shadow-2xs'
+                      : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900">Standard 0%</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">100% Inflow</span>
+                  </div>
+                  <div className="text-xs font-mono mt-1.5">
+                    Net Buffer:{' '}
+                    <strong className="text-slate-900 font-bold">
+                      {simStandardBuffer >= 0 ? `+${formatCurrency(simStandardBuffer)}` : `-${formatCurrency(Math.abs(simStandardBuffer))}`}
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-slate-500 block mt-1">Customer pays 100% full invoice</span>
+                </button>
 
-          {/* 3.5% Discount Button */}
-          <button
-            disabled={evaluating}
-            onClick={() => {
-              setAppliedParam('3.5pct');
-              handleEvaluate(0.035, undefined, selectedDocId || undefined);
-            }}
-            className={`p-3.5 rounded-xl border text-left transition-all ${
-              appliedParam === '3.5pct'
-                ? 'bg-indigo-50 border-2 border-indigo-500 text-indigo-950 ring-2 ring-indigo-200 shadow-2xs'
-                : 'bg-white hover:bg-indigo-50/40 text-slate-700 border border-indigo-200'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-indigo-950">3.5% Fast Cash</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">Fast Inflow</span>
-            </div>
-            <div className="text-xs font-mono mt-1.5">
-              Net Buffer:{' '}
-              <strong className="text-indigo-700 font-bold">
-                {sim3pctBuffer >= 0 ? `+${formatCurrency(sim3pctBuffer)}` : `-${formatCurrency(Math.abs(sim3pctBuffer))}`}
-              </strong>
-            </div>
-            <span className="text-[10px] text-indigo-700 block mt-1">
-              Customer pays 3.5% less (-{formatCurrency(Math.round(overdueBalance * 0.035))})
-            </span>
-          </button>
+                {/* 2.0% Discount Button */}
+                <button
+                  disabled={evaluating}
+                  onClick={() => {
+                    setAppliedParam('2pct');
+                    handleEvaluate(0.02, undefined, currentDocId);
+                  }}
+                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                    appliedParam === '2pct'
+                      ? 'bg-emerald-50 border-2 border-emerald-500 text-emerald-950 ring-2 ring-emerald-200 shadow-2xs'
+                      : 'bg-white hover:bg-emerald-50/40 text-slate-700 border border-emerald-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-950">2.0% Prompt Cash</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">★ Best Value</span>
+                  </div>
+                  <div className="text-xs font-mono mt-1.5">
+                    Net Buffer:{' '}
+                    <strong className="text-emerald-700 font-bold">
+                      {sim2pctBuffer >= 0 ? `+${formatCurrency(sim2pctBuffer)}` : `-${formatCurrency(Math.abs(sim2pctBuffer))}`}
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-emerald-700 block mt-1">
+                    Customer pays 2% less (-{formatCurrency(Math.round(overdueBalance * 0.02))})
+                  </span>
+                </button>
 
-          {/* 5.0% Urgent Bridge Button */}
-          <button
-            disabled={evaluating}
-            onClick={() => {
-              setAppliedParam('5pct');
-              handleEvaluate(0.05, undefined, selectedDocId || undefined);
-            }}
-            className={`p-3.5 rounded-xl border text-left transition-all ${
-              appliedParam === '5pct'
-                ? 'bg-purple-50 border-2 border-purple-500 text-purple-950 ring-2 ring-purple-200 shadow-2xs'
-                : 'bg-white hover:bg-purple-50/40 text-slate-700 border border-purple-200'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-purple-950">5.0% Urgent Bridge</span>
-              <span className="text-[10px] text-purple-800 font-bold bg-purple-100 px-1.5 py-0.5 rounded">Quick Liquidity</span>
-            </div>
-            <div className="text-xs font-mono mt-1.5">
-              Net Buffer:{' '}
-              <strong className="text-purple-700 font-bold">
-                {sim5pctBuffer >= 0 ? `+${formatCurrency(sim5pctBuffer)}` : `-${formatCurrency(Math.abs(sim5pctBuffer))}`}
-              </strong>
-            </div>
-            <span className="text-[10px] text-purple-700 block mt-1">
-              Customer pays 5% less (-{formatCurrency(Math.round(overdueBalance * 0.05))})
-            </span>
-          </button>
-        </div>
+                {/* 3.5% Discount Button */}
+                <button
+                  disabled={evaluating}
+                  onClick={() => {
+                    setAppliedParam('3.5pct');
+                    handleEvaluate(0.035, undefined, currentDocId);
+                  }}
+                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                    appliedParam === '3.5pct'
+                      ? 'bg-indigo-50 border-2 border-indigo-500 text-indigo-950 ring-2 ring-indigo-200 shadow-2xs'
+                      : 'bg-white hover:bg-indigo-50/40 text-slate-700 border border-indigo-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-indigo-950">3.5% Fast Cash</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">Fast Inflow</span>
+                  </div>
+                  <div className="text-xs font-mono mt-1.5">
+                    Net Buffer:{' '}
+                    <strong className="text-indigo-700 font-bold">
+                      {sim3pctBuffer >= 0 ? `+${formatCurrency(sim3pctBuffer)}` : `-${formatCurrency(Math.abs(sim3pctBuffer))}`}
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-indigo-700 block mt-1">
+                    Customer pays 3.5% less (-{formatCurrency(Math.round(overdueBalance * 0.035))})
+                  </span>
+                </button>
+
+                {/* 5.0% Urgent Bridge Button */}
+                <button
+                  disabled={evaluating}
+                  onClick={() => {
+                    setAppliedParam('5pct');
+                    handleEvaluate(0.05, undefined, currentDocId);
+                  }}
+                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                    appliedParam === '5pct'
+                      ? 'bg-purple-50 border-2 border-purple-500 text-purple-950 ring-2 ring-purple-200 shadow-2xs'
+                      : 'bg-white hover:bg-purple-50/40 text-slate-700 border border-purple-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-purple-950">5.0% Urgent Bridge</span>
+                    <span className="text-[10px] text-purple-800 font-bold bg-purple-100 px-1.5 py-0.5 rounded">Quick Liquidity</span>
+                  </div>
+                  <div className="text-xs font-mono mt-1.5">
+                    Net Buffer:{' '}
+                    <strong className="text-purple-700 font-bold">
+                      {sim5pctBuffer >= 0 ? `+${formatCurrency(sim5pctBuffer)}` : `-${formatCurrency(Math.abs(sim5pctBuffer))}`}
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-purple-700 block mt-1">
+                    Customer pays 5% less (-{formatCurrency(Math.round(overdueBalance * 0.05))})
+                  </span>
+                </button>
+              </div>
+            </>
+          );
+        })()}
 
         {/* Businessman's Full Supplier Settlement Commitment */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs gap-2">

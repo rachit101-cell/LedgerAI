@@ -735,25 +735,29 @@ class DecisionService:
         options_dicts = [opt.model_dump() for opt in options]
 
         if existing_case:
-            # Update current active case metrics if still in non-terminal status
-            if existing_case.status in ["recommended", "awaiting_approval"]:
-                existing_case.title = title
-                existing_case.problem_type = problem_type
-                existing_case.severity = severity
-                existing_case.urgency = urgency
-                existing_case.problem_statement = problem_statement
-                existing_case.supporting_records = json.dumps(supporting_records, default=str)
-                existing_case.calculations = json.dumps(calculations, default=str)
-                existing_case.assumptions = json.dumps(assumptions, default=str)
-                existing_case.recommended_option_id = recommended_option_id
-                existing_case.recommendation_rationale = recommendation_rationale
-                existing_case.options_json = json.dumps(options_dicts, default=str)
-                existing_case.estimated_financial_impact = estimated_impact
-                existing_case.target_document_id = target_doc_id
-                existing_case.target_contact_id = target_contact_id
-                existing_case.updated_at = utc_now()
-                db.commit()
-                db.refresh(existing_case)
+            # Always update current active case metrics and options for live re-evaluation
+            existing_case.title = title
+            existing_case.problem_type = problem_type
+            existing_case.severity = severity
+            existing_case.urgency = urgency
+            existing_case.problem_statement = problem_statement
+            existing_case.supporting_records = json.dumps(supporting_records, default=str)
+            existing_case.calculations = json.dumps(calculations, default=str)
+            existing_case.assumptions = json.dumps(assumptions, default=str)
+            existing_case.recommended_option_id = recommended_option_id
+            existing_case.recommendation_rationale = recommendation_rationale
+            existing_case.options_json = json.dumps(options_dicts, default=str)
+            existing_case.estimated_financial_impact = estimated_impact
+            existing_case.target_document_id = target_doc_id
+            existing_case.target_contact_id = target_contact_id
+            if eval_req is not None:
+                # If explicit simulation parameters were supplied, reset status to recommended so owner can choose
+                existing_case.status = "recommended"
+                existing_case.selected_option_id = None
+                existing_case.action_draft_id = None
+            existing_case.updated_at = utc_now()
+            db.commit()
+            db.refresh(existing_case)
             case_obj = existing_case
         else:
             case_obj = DecisionCase(
