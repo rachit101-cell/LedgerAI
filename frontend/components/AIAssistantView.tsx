@@ -1335,9 +1335,9 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
 
             // SVG Coordinate Calculations for the 14-Day Dual Curve
             const svgW = 800;
-            const svgH = 220;
+            const svgH = 240;
             const padX = 55;
-            const padY = 32;
+            const padY = 38;
 
             const allCashVals = [
               ...baseTrajectory.map((d) => Number(d.cash) || 0),
@@ -1775,9 +1775,9 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                             {isSupplierDay && basePt && basePt.val < 0 && (
                               <g>
                                 <rect
-                                  x={basePt.x - 48}
-                                  y={basePt.y + 8}
-                                  width="96"
+                                  x={basePt.x - 46}
+                                  y={basePt.y - 26}
+                                  width="92"
                                   height="18"
                                   rx="5"
                                   fill="#fff1f2"
@@ -1786,7 +1786,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                                 />
                                 <text
                                   x={basePt.x}
-                                  y={basePt.y + 20}
+                                  y={basePt.y - 14}
                                   textAnchor="middle"
                                   fontSize="9"
                                   fontWeight="black"
