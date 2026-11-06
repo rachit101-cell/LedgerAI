@@ -130,3 +130,4 @@ pytest tests/test_api_endpoints.py -v
 
 ## 📄 License
 This project is part of LedgerAI and is released under the [MIT License](../LICENSE).
+

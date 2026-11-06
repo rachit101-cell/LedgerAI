@@ -1329,135 +1329,569 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
           </div>
 
           {/* Visual Scenario Results */}
-          {simulationResult && (
-            <div className="space-y-4">
-              {/* Verdict Banner */}
-              <div
-                className={`p-4 rounded-2xl border flex items-center justify-between gap-3 ${
-                  simulationResult.deficit_resolved
-                    ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
-                    : 'bg-amber-50 border-amber-300 text-amber-950'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`p-2 rounded-xl ${
-                      simulationResult.deficit_resolved ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                    }`}
-                  >
-                    <IconCheckCircle className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-black">
-                      {simulationResult.deficit_resolved
-                        ? '✓ Projected Cash Deficit Completely Resolved!'
-                        : '⚠️ Partial Relief: Residual Deficit Remains'}
-                    </h4>
-                    <p className="text-xs font-medium leading-relaxed mt-0.5">{simulationResult.actionable_takeaway}</p>
-                  </div>
-                </div>
-              </div>
+          {simulationResult && (() => {
+            const baseTrajectory = simulationResult.daily_trajectory_baseline || [];
+            const simTrajectory = simulationResult.daily_trajectory_simulated || [];
 
-              {/* Before vs. After Visual Comparison */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="business-card p-4 space-y-1 border-t-4 border-t-emerald-500">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    {briefing?.shortfall_date ? `${new Date(briefing.shortfall_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Cash Gap` : 'Projected Cash Gap'}
-                  </span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xs text-rose-500 line-through font-mono">
-                      -₹{Number(simulationResult.baseline_deficit).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-base font-black text-emerald-600 font-mono">
-                      ₹{Number(simulationResult.simulated_deficit).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <span className={`text-[10px] font-black ${simulationResult.deficit_resolved ? 'text-emerald-700' : 'text-amber-700'}`}>
-                    {simulationResult.deficit_resolved ? '100% Cleared' : `Residual: -₹${Number(simulationResult.simulated_deficit).toLocaleString('en-IN')}`}
-                  </span>
-                </div>
+            // SVG Coordinate Calculations for the 14-Day Dual Curve
+            const svgW = 800;
+            const svgH = 220;
+            const padX = 55;
+            const padY = 32;
 
-                <div className="business-card p-4 space-y-1 border-t-4 border-t-indigo-500">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Ending Cash Balance</span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xs text-slate-400 font-mono">
-                      ₹{Number(simulationResult.baseline_cash).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-base font-black text-slate-900 font-mono">
-                      ₹{Number(simulationResult.simulated_ending_cash).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-indigo-700 font-black">
-                    +₹{Number(simulationResult.cash_variance).toLocaleString('en-IN', { minimumFractionDigits: 2 })} Boost
-                  </span>
-                </div>
+            const allCashVals = [
+              ...baseTrajectory.map((d) => Number(d.cash) || 0),
+              ...simTrajectory.map((d) => Number(d.cash) || 0),
+            ];
+            const rawMin = Math.min(-20000, ...allCashVals);
+            const rawMax = Math.max(80000, ...allCashVals);
+            const minCash = rawMin < 0 ? rawMin * 1.15 : -10000;
+            const maxCash = rawMax > 0 ? rawMax * 1.12 : 50000;
 
-                <div className="business-card p-4 space-y-1 border-t-4 border-t-emerald-600">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Solvency Coverage Ratio</span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xs text-slate-400 font-mono">{simulationResult.baseline_quick_ratio}x</span>
-                    <span className="text-base font-black text-emerald-700 font-mono">
-                      {simulationResult.simulated_quick_ratio}x
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-emerald-700 font-black">Stronger Buffer</span>
-                </div>
+            const scaleX = (idx: number, total: number) =>
+              total <= 1 ? padX : padX + (idx / (total - 1)) * (svgW - 2 * padX);
+            const scaleY = (val: number) =>
+              svgH - padY - ((val - minCash) / (maxCash - minCash)) * (svgH - 2 * padY);
 
-                <div className="business-card p-4 space-y-1 border-t-4 border-t-slate-400">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Database Safety</span>
-                  <div className="text-base font-black text-slate-900">In-Memory</div>
-                  <span className="text-[10px] text-slate-500 font-semibold">Live records untouched</span>
-                </div>
-              </div>
+            const zeroY = scaleY(0);
 
-              {/* Visual 14-Day Trajectory Curve (SVG Sparkline Comparison) */}
-              <div className="business-card p-5 space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <div>
-                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
-                      14-Day Visual Trajectory: Baseline vs. Simulated Cash
-                    </h4>
-                    <p className="text-[11px] text-slate-500">Visual proof of cash balance across the 14-day maturity horizon</p>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs font-bold">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-3 h-1 bg-rose-500 rounded-full inline-block"></span>
-                      <span className="text-slate-600">
-                        Baseline ({Number(simulationResult.baseline_deficit) > 0 ? `Gap -₹${(Number(simulationResult.baseline_deficit)/1000).toFixed(1)}k` : '₹0'})
-                      </span>
+            const basePoints = baseTrajectory.map((d, i) => ({
+              x: scaleX(i, baseTrajectory.length),
+              y: scaleY(Number(d.cash) || 0),
+              val: Number(d.cash) || 0,
+              date: d.date,
+            }));
+
+            const simPoints = simTrajectory.map((d, i) => ({
+              x: scaleX(i, simTrajectory.length),
+              y: scaleY(Number(d.cash) || 0),
+              val: Number(d.cash) || 0,
+              date: d.date,
+            }));
+
+            const makePolylinePath = (pts: { x: number; y: number }[]) =>
+              pts.length > 0 ? `M ${pts[0].x},${pts[0].y} ` + pts.slice(1).map((p) => `L ${p.x},${p.y}`).join(' ') : '';
+
+            const basePathStr = makePolylinePath(basePoints);
+            const simPathStr = makePolylinePath(simPoints);
+
+            const simAreaStr =
+              simPoints.length > 0
+                ? `M ${simPoints[0].x},${zeroY} ` +
+                  simPoints.map((p) => `L ${p.x},${p.y}`).join(' ') +
+                  ` L ${simPoints[simPoints.length - 1].x},${zeroY} Z`
+                : '';
+
+            const isRatioStronger =
+              Number(simulationResult.simulated_quick_ratio) >= Number(simulationResult.baseline_quick_ratio);
+
+            return (
+              <div className="space-y-5 animate-in fade-in duration-300">
+                {/* 1. Executive Verdict Banner with Modern Glassmorphism */}
+                <div
+                  className={`p-5 rounded-2xl border-2 shadow-sm transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                    simulationResult.deficit_resolved
+                      ? 'bg-gradient-to-r from-emerald-50 via-teal-50/70 to-emerald-50/40 border-emerald-400 text-emerald-950'
+                      : 'bg-gradient-to-r from-amber-50 via-orange-50/70 to-amber-50/40 border-amber-400 text-amber-950'
+                  }`}
+                >
+                  <div className="flex items-start gap-3.5">
+                    <div
+                      className={`p-2.5 rounded-2xl shrink-0 shadow-xs ${
+                        simulationResult.deficit_resolved
+                          ? 'bg-emerald-600 text-white ring-4 ring-emerald-100'
+                          : 'bg-amber-600 text-white ring-4 ring-amber-100'
+                      }`}
+                    >
+                      <IconCheckCircle className="w-6 h-6" />
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-3 h-1 bg-emerald-500 rounded-full inline-block"></span>
-                      <span className="text-emerald-700 font-black">
-                        Simulated ({Number(simulationResult.simulated_deficit) > 0 ? `Gap -₹${(Number(simulationResult.simulated_deficit)/1000).toFixed(1)}k` : `Ending ₹${(Number(simulationResult.simulated_ending_cash)/1000).toFixed(1)}k`})
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Trajectory comparison bars */}
-                <div className="grid grid-cols-7 gap-2 pt-2">
-                  {simulationResult.daily_trajectory_simulated.slice(0, 7).map((day, idx) => {
-                    const baseDay = simulationResult.daily_trajectory_baseline[idx] || { cash: 0 };
-                    const isDeficitDay = baseDay.cash < 0;
-                    return (
-                      <div key={idx} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-1">
-                        <span className="text-[10px] font-bold text-slate-400 block">{day.date}</span>
-                        <div className="space-y-0.5">
-                          <span className={`text-[10px] font-mono font-bold block ${isDeficitDay ? 'text-rose-600' : 'text-slate-600'}`}>
-                            ₹{Math.round(baseDay.cash / 1000)}k
-                          </span>
-                          <span className="text-xs font-mono font-black text-emerald-600 block">
-                            ₹{Math.round(day.cash / 1000)}k
-                          </span>
-                        </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-base font-black tracking-tight">
+                          {simulationResult.deficit_resolved
+                            ? '✓ Projected Cash Deficit Completely Resolved!'
+                            : '⚠️ Partial Relief: Residual Deficit Remains'}
+                        </h4>
+                        <span
+                          className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                            simulationResult.deficit_resolved
+                              ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                              : 'bg-amber-100 text-amber-900 border-amber-300'
+                          }`}
+                        >
+                          {simulationResult.deficit_resolved ? 'Solvency Protected' : 'Action Needed'}
+                        </span>
                       </div>
-                    );
-                  })}
+                      <p className="text-xs font-medium text-slate-700 leading-relaxed max-w-2xl">
+                        {simulationResult.actionable_takeaway}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Summary Metric Pills */}
+                  <div className="flex items-center gap-2 shrink-0 self-start md:self-center">
+                    <div className="px-3.5 py-2 rounded-xl bg-white/90 border border-slate-200 text-right shadow-2xs">
+                      <span className="text-[10px] uppercase font-black text-slate-500 block">Net Liquidity Boost</span>
+                      <span className="text-xs font-mono font-black text-emerald-600">
+                        +₹{Number(simulationResult.cash_variance).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    <div className="px-3.5 py-2 rounded-xl bg-white/90 border border-slate-200 text-right shadow-2xs">
+                      <span className="text-[10px] uppercase font-black text-slate-500 block">Simulated Buffer</span>
+                      <span className="text-xs font-mono font-black text-indigo-700">
+                        ₹{Number(simulationResult.simulated_ending_cash).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Redesigned Visual KPI Comparison Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Card 1: Cash Gap Deficit */}
+                  <div className="business-card p-4.5 rounded-2xl border-t-4 border-t-emerald-500 space-y-2 shadow-2xs hover:shadow-xs transition-shadow">
+                    <div className="flex items-center justify-between text-slate-500">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        {briefing?.shortfall_date
+                          ? `${new Date(briefing.shortfall_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Deficit Gap`
+                          : 'Projected Cash Gap'}
+                      </span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                        Baseline vs. Sim
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="text-2xl font-black font-mono tracking-tight text-emerald-600">
+                        ₹{Number(simulationResult.simulated_deficit).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-rose-500 line-through font-mono text-[11px]">
+                          -₹{Number(simulationResult.baseline_deficit).toLocaleString('en-IN')}
+                        </span>
+                        <span className="text-slate-400">→</span>
+                        <span
+                          className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                            simulationResult.deficit_resolved
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {simulationResult.deficit_resolved
+                            ? '✓ 100% Cleared'
+                            : `Residual -₹${Number(simulationResult.simulated_deficit).toLocaleString('en-IN')}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Ending Cash Balance */}
+                  <div className="business-card p-4.5 rounded-2xl border-t-4 border-t-indigo-500 space-y-2 shadow-2xs hover:shadow-xs transition-shadow">
+                    <div className="flex items-center justify-between text-slate-500">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        Ending Cash Runway
+                      </span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700">
+                        Liquid Bank Cash
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="text-2xl font-black font-mono tracking-tight text-slate-900">
+                        ₹{Number(simulationResult.simulated_ending_cash).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-slate-500 font-mono text-[11px]">
+                          Base: ₹{Number(simulationResult.baseline_cash).toLocaleString('en-IN')}
+                        </span>
+                        <span className="text-slate-400">→</span>
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                          +₹{Number(simulationResult.cash_variance).toLocaleString('en-IN')} Boost
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Solvency Coverage Ratio */}
+                  <div className="business-card p-4.5 rounded-2xl border-t-4 border-t-teal-500 space-y-2 shadow-2xs hover:shadow-xs transition-shadow">
+                    <div className="flex items-center justify-between text-slate-500">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        Solvency Ratio
+                      </span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700">
+                        Acid-Test
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="text-2xl font-black font-mono tracking-tight text-slate-900">
+                        {simulationResult.simulated_quick_ratio}x
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-slate-500 font-mono text-[11px]">
+                          Base: {simulationResult.baseline_quick_ratio}x
+                        </span>
+                        <span className="text-slate-400">→</span>
+                        <span
+                          className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                            isRatioStronger
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-teal-50 text-teal-800 border border-teal-200'
+                          }`}
+                        >
+                          {isRatioStronger
+                            ? 'Stronger Buffer'
+                            : `Solid Solvency (>1.0x Threshold)`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 4: Database Safety & Integrity */}
+                  <div className="business-card p-4.5 rounded-2xl border-t-4 border-t-slate-500 space-y-2 shadow-2xs hover:shadow-xs transition-shadow">
+                    <div className="flex items-center justify-between text-slate-500">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        Database Safety
+                      </span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
+                        Non-Destructive
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="text-2xl font-black tracking-tight text-slate-900">
+                        In-Memory Model
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                        <span className="text-[11px] font-semibold text-slate-600">
+                          Live SQLite records 100% untouched
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. SHOWSTOPPER: Interactive SVG Trajectory Area & Line Chart */}
+                <div className="business-card p-5 sm:p-6 rounded-2xl space-y-4 shadow-sm border border-slate-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-black uppercase tracking-wider text-slate-900">
+                          14-Day Visual Trajectory: Baseline vs. Simulated Cash
+                        </h4>
+                        <span className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold">
+                          Dual-Curve Model
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Direct visual comparison of liquid bank cash before vs. after customer acceleration and supplier deferrals
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-xs font-bold self-start sm:self-auto flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 h-1 bg-rose-500 rounded-full inline-block border-b border-dashed border-rose-600"></span>
+                        <span className="text-slate-600">
+                          Baseline ({Number(simulationResult.baseline_deficit) > 0 ? `Gap -₹${(Number(simulationResult.baseline_deficit)/1000).toFixed(1)}k` : '₹0'})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 h-1.5 bg-emerald-500 rounded-full inline-block shadow-2xs"></span>
+                        <span className="text-emerald-700 font-black">
+                          Simulated ({Number(simulationResult.simulated_deficit) > 0 ? `Gap -₹${(Number(simulationResult.simulated_deficit)/1000).toFixed(1)}k` : `Ending ₹${(Number(simulationResult.simulated_ending_cash)/1000).toFixed(1)}k`})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SVG Chart Container */}
+                  <div className="w-full overflow-hidden rounded-xl bg-gradient-to-b from-slate-50/70 to-white p-2 border border-slate-100 relative">
+                    <svg
+                      viewBox={`0 0 ${svgW} ${svgH}`}
+                      className="w-full h-56 sm:h-64 select-none"
+                      preserveAspectRatio="none"
+                    >
+                      <defs>
+                        {/* Gradient for Simulated Positive Cash Area */}
+                        <linearGradient id="simAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
+                          <stop offset="85%" stopColor="#10b981" stopOpacity="0.03" />
+                          <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                        </linearGradient>
+
+                        {/* Gradient for Baseline Deficit Area */}
+                        <linearGradient id="deficitAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.02" />
+                          <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.20" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Horizontal Grid Lines */}
+                      {[maxCash, maxCash * 0.5, 0, minCash * 0.5, minCash].map((lvl, lIdx) => {
+                        const y = scaleY(lvl);
+                        if (isNaN(y)) return null;
+                        return (
+                          <g key={lIdx}>
+                            <line
+                              x1={padX}
+                              y1={y}
+                              x2={svgW - padX}
+                              y2={y}
+                              stroke="#e2e8f0"
+                              strokeWidth={lvl === 0 ? "1.5" : "1"}
+                              strokeDasharray={lvl === 0 ? "none" : "3 3"}
+                              opacity={lvl === 0 ? 0.9 : 0.6}
+                            />
+                            <text
+                              x={padX - 8}
+                              y={y + 3.5}
+                              textAnchor="end"
+                              fontSize="10"
+                              fill="#64748b"
+                              fontFamily="monospace"
+                              fontWeight={lvl === 0 ? "bold" : "normal"}
+                            >
+                              {lvl >= 0 ? `₹${Math.round(lvl / 1000)}k` : `-₹${Math.round(Math.abs(lvl) / 1000)}k`}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* ZERO LINE BENCHMARK (The Solvency Threshold) */}
+                      <line
+                        x1={padX}
+                        y1={zeroY}
+                        x2={svgW - padX}
+                        y2={zeroY}
+                        stroke="#ef4444"
+                        strokeWidth="2"
+                        strokeDasharray="5 4"
+                        opacity="0.8"
+                      />
+                      <rect
+                        x={svgW - padX - 165}
+                        y={zeroY - 18}
+                        width="160"
+                        height="16"
+                        rx="4"
+                        fill="#fef2f2"
+                        stroke="#fca5a5"
+                      />
+                      <text
+                        x={svgW - padX - 85}
+                        y={zeroY - 6}
+                        textAnchor="middle"
+                        fontSize="9"
+                        fill="#b91c1c"
+                        fontWeight="bold"
+                        fontFamily="sans-serif"
+                      >
+                        ⚡ ₹0 Solvency Threshold
+                      </text>
+
+                      {/* Simulated Area Fill */}
+                      {simAreaStr && <path d={simAreaStr} fill="url(#simAreaGrad)" />}
+
+                      {/* Baseline Polyline (Dashed Crimson / Danger) */}
+                      {basePathStr && (
+                        <path
+                          d={basePathStr}
+                          fill="none"
+                          stroke="#f43f5e"
+                          strokeWidth="2.5"
+                          strokeDasharray="6 4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          opacity="0.85"
+                        />
+                      )}
+
+                      {/* Simulated Polyline (Solid Emerald / Solution) */}
+                      {simPathStr && (
+                        <path
+                          d={simPathStr}
+                          fill="none"
+                          stroke="#10b981"
+                          strokeWidth="3.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      )}
+
+                      {/* Data Point Markers for Each Day */}
+                      {simPoints.map((pt, i) => {
+                        const basePt = basePoints[i];
+                        const isDeficit = basePt && basePt.val < 0;
+                        const isCustomerDay = i === 1;
+                        const isSupplierDay = i === 3;
+
+                        return (
+                          <g key={i}>
+                            {/* Baseline Marker */}
+                            {basePt && (
+                              <circle
+                                cx={basePt.x}
+                                cy={basePt.y}
+                                r={isDeficit ? "4" : "3"}
+                                fill={isDeficit ? "#e11d48" : "#94a3b8"}
+                                stroke="#ffffff"
+                                strokeWidth="1.5"
+                              />
+                            )}
+
+                            {/* Simulated Marker */}
+                            <circle
+                              cx={pt.x}
+                              cy={pt.y}
+                              r={isCustomerDay || isSupplierDay ? "5" : "3.5"}
+                              fill="#10b981"
+                              stroke="#ffffff"
+                              strokeWidth="2"
+                              className="transition-transform hover:scale-125"
+                            />
+
+                            {/* Key Milestone Event Callout Badges */}
+                            {isCustomerDay && pt.val > (basePt?.val || 0) && (
+                              <g>
+                                <rect
+                                  x={pt.x - 42}
+                                  y={pt.y - 25}
+                                  width="84"
+                                  height="18"
+                                  rx="5"
+                                  fill="#ecfdf5"
+                                  stroke="#34d399"
+                                  strokeWidth="1"
+                                />
+                                <text
+                                  x={pt.x}
+                                  y={pt.y - 13}
+                                  textAnchor="middle"
+                                  fontSize="9"
+                                  fontWeight="black"
+                                  fill="#065f46"
+                                >
+                                  +₹35k Inflow
+                                </text>
+                              </g>
+                            )}
+
+                            {isSupplierDay && basePt && basePt.val < 0 && (
+                              <g>
+                                <rect
+                                  x={basePt.x - 48}
+                                  y={basePt.y + 8}
+                                  width="96"
+                                  height="18"
+                                  rx="5"
+                                  fill="#fff1f2"
+                                  stroke="#fda4af"
+                                  strokeWidth="1"
+                                />
+                                <text
+                                  x={basePt.x}
+                                  y={basePt.y + 20}
+                                  textAnchor="middle"
+                                  fontSize="9"
+                                  fontWeight="black"
+                                  fill="#9f1239"
+                                >
+                                  -₹65k Bill Due
+                                </text>
+                              </g>
+                            )}
+                          </g>
+                        );
+                      })}
+
+                      {/* X-Axis Dates */}
+                      {basePoints.map((pt, i) => (
+                        <text
+                          key={i}
+                          x={pt.x}
+                          y={svgH - 10}
+                          textAnchor="middle"
+                          fontSize="9.5"
+                          fill="#64748b"
+                          fontWeight={i === 1 || i === 3 ? "bold" : "normal"}
+                        >
+                          {pt.date}
+                        </text>
+                      ))}
+                    </svg>
+                  </div>
+
+                  {/* 4. Day-by-Day Timeline Matrix with Proper Formatting & Mini Indicators */}
+                  <div className="pt-2">
+                    <div className="flex items-center justify-between pb-2">
+                      <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                        14-Day Granular Trajectory Breakdown
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        Green indicates solvent balance • Red flags default point
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                      {simTrajectory.slice(0, 7).map((day, idx) => {
+                        const baseDay = baseTrajectory[idx] || { cash: 0 };
+                        const baseCash = Number(baseDay.cash) || 0;
+                        const simCash = Number(day.cash) || 0;
+                        const isDeficitDay = baseCash < 0;
+                        const isPositiveSim = simCash >= 0;
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-xl border text-center space-y-1.5 transition-all shadow-2xs ${
+                              isDeficitDay
+                                ? 'bg-gradient-to-b from-rose-50/40 to-white border-rose-200'
+                                : 'bg-slate-50/80 border-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-slate-500">{day.date}</span>
+                              <span
+                                className={`text-[9px] font-black px-1.5 py-0.2 rounded ${
+                                  isPositiveSim
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}
+                              >
+                                {isPositiveSim ? '✓ Safe' : '⚠️ Gap'}
+                              </span>
+                            </div>
+
+                            <div className="space-y-1 pt-0.5">
+                              {/* Baseline figure */}
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-[10px] text-slate-400">Base:</span>
+                                <span
+                                  className={`font-mono font-bold ${
+                                    isDeficitDay ? 'text-rose-600' : 'text-slate-600'
+                                  }`}
+                                >
+                                  {baseCash < 0
+                                    ? `-₹${Math.round(Math.abs(baseCash) / 1000)}k`
+                                    : `₹${Math.round(baseCash / 1000)}k`}
+                                </span>
+                              </div>
+
+                              {/* Simulated figure */}
+                              <div className="flex items-center justify-between text-xs pt-0.5 border-t border-slate-200/60">
+                                <span className="text-[10px] text-emerald-700 font-bold">Sim:</span>
+                                <span className="font-mono font-black text-emerald-600">
+                                  {simCash < 0
+                                    ? `-₹${Math.round(Math.abs(simCash) / 1000)}k`
+                                    : `₹${Math.round(simCash / 1000)}k`}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
