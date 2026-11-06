@@ -141,13 +141,15 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
   };
 
   // Run What-If Scenario Calculation
-  const handleRunSimulation = async (preset?: { customer?: number; delay?: number }) => {
+  const handleRunSimulation = async (preset?: { customer?: number; delay?: number; growth?: number }) => {
     setLoadingSim(true);
     const customerAmt = preset?.customer !== undefined ? preset.customer : simCustomerAmount;
     const delayDays = preset?.delay !== undefined ? preset.delay : simSupplierDelayDays;
+    const revGrowth = preset?.growth !== undefined ? preset.growth : simRevenueGrowth;
 
     if (preset?.customer !== undefined) setSimCustomerAmount(preset.customer);
     if (preset?.delay !== undefined) setSimSupplierDelayDays(preset.delay);
+    if (preset?.growth !== undefined) setSimRevenueGrowth(preset.growth);
 
     try {
       const result = await api.simulateWhatIfScenario({
@@ -155,7 +157,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
         customer_payment_amount: customerAmt,
         customer_payment_day_offset: simCustomerDays,
         delay_supplier_days: delayDays,
-        revenue_growth_percent: simRevenueGrowth,
+        revenue_growth_percent: revGrowth,
       });
       setSimulationResult(result);
     } catch (err) {
@@ -164,6 +166,15 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
       setLoadingSim(false);
     }
   };
+
+  // Auto-run What-If calculation whenever sliders change (debounced 150ms)
+  useEffect(() => {
+    if (activeTab !== 'whatif') return;
+    const timer = setTimeout(() => {
+      handleRunSimulation();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [simCustomerAmount, simSupplierDelayDays, simRevenueGrowth, activeTab]);
 
   // Save Current Briefing
   const handleSaveReport = async () => {
@@ -184,7 +195,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
   const receivables = Number(briefing?.total_receivables || 134500);
   const overdueRec = Number(briefing?.overdue_receivables || 53500);
   const payables = Number(briefing?.total_payables_due || 77500);
-  const shortfall = Number(briefing?.projected_shortfall || 32500);
+  const shortfall = Number(briefing?.projected_shortfall !== undefined ? briefing.projected_shortfall : 20000);
   const netCushion = Number(briefing?.net_working_capital || 42000);
   const quickRatio = briefing?.quick_ratio || 1.54;
   const score = healthScore?.overall_score || 68;
@@ -297,7 +308,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                   Projected Cash Gap: -₹{shortfall.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-300 text-amber-950 border border-amber-500/70 shadow-2xs">
-                  Due 2026-10-19
+                  {briefing?.shortfall_date ? `Due ${briefing.shortfall_date}` : 'Due in 3 Days'}
                 </span>
               </div>
               <div className="text-xs font-bold text-slate-900">
@@ -389,7 +400,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Supplier Obligations</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200">
-                  Due Oct 19
+                  {briefing?.shortfall_date ? `Due ${new Date(briefing.shortfall_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'Due Soon'}
                 </span>
               </div>
               <div className="text-xl font-black text-slate-900 font-mono">
@@ -401,7 +412,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
               </div>
               <div className="flex items-center justify-between text-[11px] text-slate-500">
                 <span>Sunrise: ₹65k (84%)</span>
-                <span className="font-bold text-rose-600">Deficit: ₹32.5k</span>
+                <span className="font-bold text-rose-600">Deficit: ₹{(shortfall / 1000).toFixed(1)}k</span>
               </div>
             </div>
 
@@ -446,7 +457,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                     </span>
                   </div>
                   <h4 className="text-xs font-black text-slate-900 leading-snug">
-                    Eliminate ₹32,500 Cash Gap (Due Oct 19)
+                    Eliminate ₹{shortfall.toLocaleString('en-IN')} Cash Gap ({briefing?.shortfall_date ? `Due ${new Date(briefing.shortfall_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'Due Soon'})
                   </h4>
                   <div className="p-2.5 rounded-xl bg-white border border-rose-200 text-[11px] font-semibold text-rose-950">
                     Collect ₹35,000 from Sharma Traders with 2% Early Pay settlement to unlock immediate bank funds.
@@ -559,7 +570,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                   {healthScore?.rating || 'Attention Needed'}
                 </span>
                 <p className="text-xs text-slate-600 max-w-xs leading-relaxed font-medium">
-                  Solvent on accrual balance sheet (1.54x), but facing a ₹32,500 timing deficit on Oct 19.
+                  Solvent on accrual balance sheet ({quickRatio}x), but facing a ₹{shortfall.toLocaleString('en-IN')} timing deficit {briefing?.shortfall_date ? `on ${new Date(briefing.shortfall_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'soon'}.
                 </p>
               </div>
             </div>
@@ -589,7 +600,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                     <div className="bg-amber-500 h-full rounded-full" style={{ width: '55%' }} />
                   </div>
                   <div className="text-[11px] text-slate-500 font-medium">
-                    ⚡ <strong>Fix:</strong> Execute early pay settlement to eliminate Oct 19 deficit.
+                    ⚡ <strong>Fix:</strong> Execute early pay settlement to eliminate projected deficit.
                   </div>
                 </div>
 
@@ -692,9 +703,9 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-600 text-white">
                       Critical Risk
                     </span>
-                    <span className="text-sm font-black text-rose-700 font-mono">-₹32,500.00</span>
+                    <span className="text-sm font-black text-rose-700 font-mono">-₹{shortfall.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
-                  <h4 className="text-xs font-black text-slate-900">Projected Cash Deficit on Oct 19</h4>
+                  <h4 className="text-xs font-black text-slate-900">Projected Cash Deficit {briefing?.shortfall_date ? `on ${new Date(briefing.shortfall_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'Upcoming'}</h4>
                   <p className="text-[11px] text-slate-600">
                     Bank cash (₹45,000) falls short when Sunrise bill (₹65,000) matures.
                   </p>
@@ -856,7 +867,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
               <div className="p-2.5 px-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
                 <span className="text-[10px] text-slate-500 block font-bold uppercase tracking-wider flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                  Oct 19 Gap
+                  Projected Gap
                 </span>
                 <span className="font-mono font-black text-rose-700 text-sm sm:text-base mt-0.5 block">-₹{shortfall.toLocaleString('en-IN')}</span>
               </div>
@@ -932,7 +943,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                                 onClick={() => handleSend('Will I have enough cash to pay my supplier this week?')}
                                 className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-indigo-600 hover:text-white border border-indigo-200 text-indigo-700 font-bold text-[11px] transition-all shadow-2xs"
                               >
-                                ⚡ Check Oct 19 Cash Gap
+                                ⚡ Check Cash Deficit Gap
                               </button>
                               <button
                                 onClick={() => handleSend('Who owes us money? Analyze customer payment behavior')}
@@ -1031,7 +1042,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                   disabled={loadingChat}
                   className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 font-bold whitespace-nowrap transition-all border border-slate-200"
                 >
-                  ⚡ Cash Gap Oct 19
+                  ⚡ Cash Deficit Gap
                 </button>
                 <button
                   onClick={() => handleSend('Who owes us money? Analyze customer payment behavior')}
@@ -1116,7 +1127,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                       Will I have enough cash to pay my supplier this week?
                     </p>
                     <span className="text-[10px] text-rose-700 block font-semibold">
-                      Analyzes impending -₹32,500 gap on Oct 19
+                      Analyzes impending liquidity deficit against supplier bills
                     </span>
                   </div>
 
@@ -1293,7 +1304,20 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
               </div>
             </div>
 
-            <div className="flex justify-end pt-1">
+            <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center gap-2">
+                {loadingSim ? (
+                  <span className="text-xs font-bold text-indigo-600 animate-pulse flex items-center gap-1.5">
+                    <IconRefresh className="w-3.5 h-3.5 animate-spin" />
+                    <span>Recalculating Scenario Live...</span>
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+                    <IconCheckCircle className="w-3.5 h-3.5" />
+                    <span>Live Synced with Sliders</span>
+                  </span>
+                )}
+              </div>
               <button
                 onClick={() => handleRunSimulation()}
                 disabled={loadingSim}
@@ -1337,7 +1361,9 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
               {/* Before vs. After Visual Comparison */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="business-card p-4 space-y-1 border-t-4 border-t-emerald-500">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Oct 19 Cash Gap</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    {briefing?.shortfall_date ? `${new Date(briefing.shortfall_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Cash Gap` : 'Projected Cash Gap'}
+                  </span>
                   <div className="flex items-baseline gap-2">
                     <span className="text-xs text-rose-500 line-through font-mono">
                       -₹{Number(simulationResult.baseline_deficit).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -1346,7 +1372,9 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                       ₹{Number(simulationResult.simulated_deficit).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <span className="text-[10px] text-emerald-700 font-black">100% Cleared</span>
+                  <span className={`text-[10px] font-black ${simulationResult.deficit_resolved ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    {simulationResult.deficit_resolved ? '100% Cleared' : `Residual: -₹${Number(simulationResult.simulated_deficit).toLocaleString('en-IN')}`}
+                  </span>
                 </div>
 
                 <div className="business-card p-4 space-y-1 border-t-4 border-t-indigo-500">
@@ -1389,16 +1417,20 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                     <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
                       14-Day Visual Trajectory: Baseline vs. Simulated Cash
                     </h4>
-                    <p className="text-[11px] text-slate-500">Visual proof of cash balance across the Oct 19 maturity date</p>
+                    <p className="text-[11px] text-slate-500">Visual proof of cash balance across the 14-day maturity horizon</p>
                   </div>
                   <div className="flex items-center gap-3 text-xs font-bold">
                     <div className="flex items-center gap-1.5">
                       <span className="w-3 h-1 bg-rose-500 rounded-full inline-block"></span>
-                      <span className="text-slate-600">Baseline (Gap -₹32.5k)</span>
+                      <span className="text-slate-600">
+                        Baseline ({Number(simulationResult.baseline_deficit) > 0 ? `Gap -₹${(Number(simulationResult.baseline_deficit)/1000).toFixed(1)}k` : '₹0'})
+                      </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="w-3 h-1 bg-emerald-500 rounded-full inline-block"></span>
-                      <span className="text-emerald-700 font-black">Simulated (Surplus +₹2.5k)</span>
+                      <span className="text-emerald-700 font-black">
+                        Simulated ({Number(simulationResult.simulated_deficit) > 0 ? `Gap -₹${(Number(simulationResult.simulated_deficit)/1000).toFixed(1)}k` : `Ending ₹${(Number(simulationResult.simulated_ending_cash)/1000).toFixed(1)}k`})
+                      </span>
                     </div>
                   </div>
                 </div>
